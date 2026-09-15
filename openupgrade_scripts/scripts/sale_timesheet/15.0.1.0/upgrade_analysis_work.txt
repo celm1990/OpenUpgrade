@@ -49,7 +49,7 @@ sale_timesheet / sale.order.line          / has_displayed_warning_upsell (boolea
 # NOTHING TO DO: new field for new feature
 
 sale_timesheet / sale.order.line          / remaining_hours (float)       : is now stored
-# NOTHING TO DO: handed by ORM
+# DONE: pre-migration: Pre-create the column and compute it using SQL to enhance performance.
 
 ---XML records in module 'sale_timesheet'---
 DEL ir.actions.act_window: sale_timesheet.project_profitability_report_action
