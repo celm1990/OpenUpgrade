@@ -174,5 +174,23 @@ env["account.reconcile.model"].create(
     }
 )
 
+env["account.reconcile.model"].create(
+    {
+        "name": "Model with partner mapping, regex with global flags",
+        "match_label": "match_regex",
+        "match_label_param": "(?i)hello world",
+        "partner_mapping_line_ids": [
+            (
+                0,
+                0,
+                {
+                    "partner_id": env.user.partner_id.id,
+                    "payment_ref_regex": "(?i)hello",
+                    "narration_regex": "world",
+                },
+            ),
+        ],
+    }
+)
 
 env.cr.commit()

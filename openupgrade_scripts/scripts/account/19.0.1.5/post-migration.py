@@ -7,6 +7,21 @@ from openupgradelib import openupgrade
 
 from odoo.orm.commands import Command
 
+LEADING_GLOBAL_FLAGS_RE = re.compile(r"^\(\?([a-zA-Z]+)\)")
+
+
+def _split_global_flags(regex):
+    """
+    Split the leading global inline flags (e.g. ``(?i)``) from a regex, as
+    they are only valid at the start of the expression, both in Python and
+    PostgreSQL, so they must be moved when combining several regexes
+    """
+    flags = ""
+    while match := LEADING_GLOBAL_FLAGS_RE.match(regex):
+        flags += match.group(1)
+        regex = regex[match.end() :]
+    return flags, regex
+
 
 def account_reconcile_model(env):
     """
@@ -55,6 +70,7 @@ def account_reconcile_model_partner_mapping(env):
         narration_regexes,
     ) in env.cr.fetchall():
         reconcile_model = AccountReconcileModel.browse(reconcile_model_id)
+        match_regex_flags = ""
         match_regex_lookahead = ""
         if reconcile_model.match_label_param:
             if reconcile_model.match_label == "contains":
@@ -66,7 +82,10 @@ def account_reconcile_model_partner_mapping(env):
                     f"(?!{re.escape(reconcile_model.match_label_param)})"
                 )
             elif reconcile_model.match_label == "match_regex":
-                match_regex_lookahead = f"(?={reconcile_model.match_label_param})"
+                match_regex_flags, match_label_param = _split_global_flags(
+                    reconcile_model.match_label_param
+                )
+                match_regex_lookahead = f"(?={match_label_param})"
 
         for mapping_id, partner_id, payment_ref_regex, narration_regex in zip(
             mapping_ids,
@@ -76,17 +95,25 @@ def account_reconcile_model_partner_mapping(env):
             strict=True,
         ):
             partner = ResPartner.browse(partner_id)
-            match_regex = "|".join(
-                map(
-                    lambda x: f"({x})",
-                    filter(None, [payment_ref_regex, narration_regex]),
-                )
-            )
+            flags = match_regex_flags
+            partner_regexes = []
+            for regex in filter(None, [payment_ref_regex, narration_regex]):
+                regex_flags, regex = _split_global_flags(regex)
+                flags += regex_flags
+                partner_regexes.append(f"({regex})")
+            match_regex = "|".join(partner_regexes)
+            if flags:
+                # remove duplicated flags keeping their order
+                match_regex_flags_prefix = f"(?{''.join(dict.fromkeys(flags))})"
+            else:
+                match_regex_flags_prefix = ""
             new_reconcile_model = reconcile_model.copy(
                 {
                     "name": reconcile_model.name + f" ({partner.name})",
                     "match_label": "match_regex",
-                    "match_label_param": match_regex_lookahead + match_regex,
+                    "match_label_param": match_regex_flags_prefix
+                    + match_regex_lookahead
+                    + match_regex,
                     "line_ids": [
                         Command.create(
                             {

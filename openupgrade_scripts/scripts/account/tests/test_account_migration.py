@@ -54,6 +54,10 @@ class TestAccountMigration(TransactionCase):
             "Model with partner mapping, regex label matching",
             "(?=hello world)(hello)|(world)",
         )
+        self._test_reconcile_model_partner_mapping(
+            "Model with partner mapping, regex with global flags",
+            "(?i)(?=hello world)(hello)|(world)",
+        )
 
     def _test_reconcile_model_partner_mapping(self, name, combined_regex):
         models = self.env["account.reconcile.model"].search(
